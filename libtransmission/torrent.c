@@ -645,6 +645,7 @@ calculatePiecePriority (const tr_torrent * tor,
 {
   tr_file_index_t i;
   tr_priority_t priority = TR_PRI_LOW;
+  tr_priority_t weight;
 
   /* find the first file that has data in this piece */
   if (fileHint >= 0)
@@ -674,9 +675,26 @@ calculatePiecePriority (const tr_torrent * tor,
       /* when dealing with multimedia files, getting the first and
          last pieces can sometimes allow you to preview it a bit
          before it's fully downloaded... */
-      if (file->priority >= TR_PRI_NORMAL)
+      if (file->priority >= TR_PRI_NORMAL && priority < TR_PRI_HIGH)
         if (file->firstPiece == piece || file->lastPiece == piece)
           priority = TR_PRI_HIGH;
+      
+      /* for hight priority file, then piece of begining of file has higher priority.
+         this feature is for streaming.
+        */
+      if (file->priority == TR_PRI_HIGH) {
+        if (file->lastPiece == piece && file->firstPiece != file->lastPiece) {
+          weight = (1 << 6) + 1;
+        } else {
+          weight = ((
+                      (((tr_piece_index_t)(file->lastPiece - piece + 1)) << 6) 
+                      / 
+                      ((tr_piece_index_t)(file->lastPiece - file->firstPiece + 1))
+                    ) + 1)
+                  & 0x7f;
+        }
+        priority = MAX(priority, weight);
+      }
     }
 
   return priority;
